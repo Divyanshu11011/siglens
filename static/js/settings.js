@@ -23,6 +23,7 @@ $(document).ready(function () {
     getRetentionDataFromConfig();
     getPersistentQueriesSetting();
     getSystemInfo();
+    getEtcdData();
     {{ .SettingsExtraOnReadySetup }}
     {{ .Button1Function }}
 });
@@ -183,3 +184,43 @@ function formatUptime(uptimeMinutes) {
     }
 }
 
+function getEtcdData() {
+    $.ajax({
+        method: "GET",
+        url: "/api/etcd-data",
+        headers: {
+            "Content-Type": "application/json; charset=utf-8",
+            Accept: "*/*",
+        },
+        crossDomain: true,
+        success: function (res) {
+
+            if (res.message === "Distributed mode is not enabled") {
+                $("#etcd-data-table").html("<tr><td>Distributed mode is not enabled</td></tr>");
+            } else if ($.isEmptyObject(res.data)) {
+                $("#etcd-data-table").html("<tr><td>No Etcd Data</td></tr>");
+            } else {
+                addEtcdDataTable(res.data);
+            }
+        },
+        error: function (xhr, status, error) {
+            console.error("Failed to fetch ETCD data:", xhr, status, error);
+            $("#etcd-data-table").html("<tr><td>Failed to fetch ETCD data</td></tr>");
+        },
+    });
+}
+
+function addEtcdDataTable(data) {
+    var table = $("#etcd-data-table");
+    table.empty();
+
+    function createRow(key, value) {
+        return `<tr><th>${key}</th><td>${value}</td></tr>`;
+    }
+
+    for (var key in data) {
+        if (data.hasOwnProperty(key)) {
+            table.append(createRow(key, data[key]));
+        }
+    }
+}

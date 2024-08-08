@@ -19,6 +19,9 @@ package queryserver
 
 import (
 	"time"
+	"context"
+	"fmt"
+	"encoding/json"
 
 	"github.com/fasthttp/websocket"
 
@@ -44,11 +47,16 @@ import (
 	usq "github.com/siglens/siglens/pkg/usersavedqueries"
 	"github.com/siglens/siglens/pkg/utils"
 	log "github.com/sirupsen/logrus"
+	"go.etcd.io/etcd/client/v3"
 	"github.com/valyala/fasthttp"
 )
 
 type VersionResponse struct {
 	Version string `json:"version"`
+}
+
+type EtcdResponse struct {
+	Data map[string]string `json:"data"`
 }
 
 func getVersionHandler() func(ctx *fasthttp.RequestCtx) {
@@ -670,4 +678,48 @@ func getSystemInfoHandler() func(ctx *fasthttp.RequestCtx) {
 	return func(ctx *fasthttp.RequestCtx) {
 		systemconfig.GetSystemInfo(ctx)
 	}
+}
+
+// Function to fetch data from ETCD
+func fetchEtcdData() (map[string]string, string, error) {
+	
+    cli, err := clientv3.New(clientv3.Config{
+        Endpoints:   []string{"http://127.0.0.1:2379"},
+        DialTimeout: 5 * time.Second,
+    })
+    if err != nil {
+        return nil, "Distributed mode is not enabled", nil
+    }
+    defer cli.Close()
+
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+
+    resp, err := cli.Get(ctx, "", clientv3.WithPrefix())
+    if err != nil {
+        return nil, "Distributed mode is not enabled", nil
+    }
+
+    result := make(map[string]string)
+    for _, kv := range resp.Kvs {
+        result[string(kv.Key)] = string(kv.Value)
+    }
+    return result, "", nil
+}
+
+func etcdDataHandler(ctx *fasthttp.RequestCtx) {
+    data, message, err := fetchEtcdData()
+    if err != nil {
+        ctx.SetStatusCode(fasthttp.StatusInternalServerError)
+        ctx.SetContentType("application/json")
+        fmt.Fprintf(ctx, `{"message": "Failed to fetch data from etcd: %s"}`, err.Error())
+        return
+    }
+
+    ctx.SetContentType("application/json")
+    if message != "" {
+        json.NewEncoder(ctx).Encode(map[string]string{"message": message})
+    } else {
+        json.NewEncoder(ctx).Encode(map[string]interface{}{"data": data})
+    }
 }

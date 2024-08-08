@@ -247,6 +247,7 @@ func (hs *queryserverCfg) Run(htmlTemplate *htmltemplate.Template, textTemplate 
 	// query server should still setup ES APIs for Kibana integration
 	hs.Router.POST(server_utils.ELASTIC_PREFIX+"/_bulk", hs.Recovery(esPostBulkHandler()))
 	hs.Router.PUT(server_utils.ELASTIC_PREFIX+"/{indexName}", hs.Recovery(esPutIndexHandler()))
+	hs.Router.GET(server_utils.API_PREFIX+"/etcd-data", tracing.TraceMiddleware(hs.Recovery(etcdDataHandler)))
 
 	hs.Router.GET(server_utils.API_PREFIX+"/system-info", tracing.TraceMiddleware(hs.Recovery(getSystemInfoHandler())))
 	if config.IsDebugMode() {
